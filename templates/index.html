@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center py-16">
+  <div class="text-6xl mb-6">📱</div>
+  <h1 class="text-3xl md:text-4xl font-bold mb-3">
+    {{ 'مرحباً بك في OTP Browser' if lang=='ar' else 'Welcome to OTP Browser' }}
+  </h1>
+  <p class="text-slate-400 mb-8 max-w-xl mx-auto">
+    {{ 'اختر رقماً أمريكياً لعرض رسائله واستخراج أكواد OTP — 3 أرقام مجاناً يومياً.' if lang=='ar'
+       else 'Browse US numbers, read their SMS, extract OTP codes — 3 free numbers per day.' }}
+  </p>
+  <a href="{{ url_for('numbers') }}"
+     class="inline-block px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 font-semibold transition shadow-lg shadow-cyan-500/30">
+    {{ 'ابدأ الآن' if lang=='ar' else 'Get started' }} →
+  </a>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-16 text-start">
+    <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+      <div class="text-3xl mb-2">🇺🇸</div>
+      <h3 class="font-bold mb-1">{{ 'أمريكا مجاناً' if lang=='ar' else 'USA free' }}</h3>
+      <p class="text-sm text-slate-400">{{ '3 أرقام/يوم' if lang=='ar' else '3 numbers/day' }}</p>
+    </div>
+    <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+      <div class="text-3xl mb-2">💎</div>
+      <h3 class="font-bold mb-1">Premium</h3>
+      <p class="text-sm text-slate-400">{{ 'دول أخرى' if lang=='ar' else 'Other countries' }}</p>
+    </div>
+    <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800">
+      <div class="text-3xl mb-2">⚡</div>
+      <h3 class="font-bold mb-1">OTP</h3>
+      <p class="text-sm text-slate-400">{{ 'استخراج تلقائي' if lang=='ar' else 'Auto-extract' }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
