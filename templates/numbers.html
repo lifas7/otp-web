@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between flex-wrap gap-3 bg-[#161b22] p-4 rounded-xl border border-slate-800">
+  <h1 class="text-2xl font-bold flex items-center gap-2 text-white">📍 الأرقام المتاحة</h1>
+  <div class="text-sm px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+    🎟 استخدمت: <span class="text-cyan-400 font-bold">{{ used }}/{{ mx }}</span>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+  <div class="p-4 rounded-xl bg-cyan-900/20 border border-cyan-500/50 text-center shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+    <div class="text-3xl mb-1">🇺🇸</div>
+    <div class="text-sm font-bold text-cyan-400">أمريكا</div>
+    <div class="text-xs text-slate-300">مجاني 3/يوم</div>
+  </div>
+  
+  <a href="https://t.me/{{ admin }}" target="_blank" class="p-4 rounded-xl bg-[#161b22] border border-slate-700 text-center hover:border-purple-500 transition group">
+    <div class="text-3xl mb-1 grayscale group-hover:grayscale-0">🇬🇧</div>
+    <div class="text-sm font-bold text-slate-200">بريطانيا</div>
+    <div class="text-xs text-purple-400 mt-1">تواصل: @lifas_py</div>
+  </a>
+  
+  <a href="https://t.me/{{ admin }}" target="_blank" class="p-4 rounded-xl bg-[#161b22] border border-slate-700 text-center hover:border-purple-500 transition group">
+    <div class="text-3xl mb-1 grayscale group-hover:grayscale-0">🇨🇦</div>
+    <div class="text-sm font-bold text-slate-200">كندا</div>
+    <div class="text-xs text-purple-400 mt-1">تواصل: @lifas_py</div>
+  </a>
+
+  <a href="https://t.me/{{ admin }}" target="_blank" class="p-4 rounded-xl bg-[#161b22] border border-slate-700 text-center hover:border-purple-500 transition group">
+    <div class="text-3xl mb-1 grayscale group-hover:grayscale-0">🇩🇪</div>
+    <div class="text-sm font-bold text-slate-200">ألمانيا</div>
+    <div class="text-xs text-purple-400 mt-1">تواصل: @lifas_py</div>
+  </a>
+</div>
+
+{% if error %}
+  <div class="p-4 rounded-xl bg-red-900/20 border border-red-700 text-red-400 mb-6 flex items-center gap-3"><span class="text-2xl">⚠️</span> {{ error }}</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+  {% for r in rows %}
+    <a href="{{ url_for('messages', num_id=r.id, phone=r.phone_number) }}" class="block p-4 rounded-xl bg-[#161b22] border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/80 transition-all transform hover:-translate-y-0.5 group">
+      <div class="flex items-center justify-between">
+        <span class="font-mono text-lg text-slate-200 group-hover:text-cyan-300 transition-colors" dir="ltr">{{ r.phone_number }}</span>
+        <span class="text-xs px-2 py-1 rounded-md font-semibold {{ 'bg-green-500/10 text-green-400 border border-green-500/20' if r.status=='Active' else 'bg-slate-800 text-slate-500 border border-slate-700' }}">{{ r.status }}</span>
+      </div>
+      <div class="mt-2 flex items-center justify-between text-sm text-slate-500">
+        <span>📨 {{ r.messages_count }} رسالة</span>
+        <span dir="ltr">{{ r.released_at[:10] }}</span>
+      </div>
+    </a>
+  {% endfor %}
+</div>
+
+<div class="flex justify-center items-center gap-4 mt-8">
+  {% if page > 1 %}<a href="?page={{ page-1 }}" class="px-5 py-2.5 rounded-xl bg-[#161b22] border border-slate-700 hover:bg-slate-800 hover:text-cyan-400 transition">◀️ السابق</a>{% endif %}
+  <span class="px-4 py-2 rounded-lg bg-slate-900 text-sm font-bold border border-slate-800">{{ page }} / {{ last }}</span>
+  {% if page < last %}<a href="?page={{ page+1 }}" class="px-5 py-2.5 rounded-xl bg-[#161b22] border border-slate-700 hover:bg-slate-800 hover:text-cyan-400 transition">التالي ▶️</a>{% endif %}
+</div>
+{% endblock %}
