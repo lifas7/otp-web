@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if blocked %}
+  <div class="max-w-xl mx-auto p-8 rounded-3xl bg-[#161b22] border border-amber-500/30 text-center mt-10">
+    <div class="w-20 h-20 mx-auto bg-amber-500/10 rounded-full flex items-center justify-center mb-6"><span class="text-5xl">🔒</span></div>
+    <h2 class="text-2xl font-bold mb-3 text-amber-400">نفدت محاولاتك المجانية!</h2>
+    <p class="text-slate-300 text-base mb-8">لقد استهلكت الـ 3 أرقام المجانية لهذا اليوم. يرجى الانتظار 24 ساعة أو الترقية.</p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="https://t.me/{{ admin }}" target="_blank" class="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold transition">💎 اشترك الآن</a>
+      <a href="{{ url_for('numbers') }}" class="px-6 py-3 rounded-xl bg-slate-800 text-white font-bold transition">🔄 رجوع</a>
+    </div>
+  </div>
+{% else %}
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3 bg-[#161b22] p-4 rounded-xl border border-slate-800">
+    <div>
+      <h1 class="text-xl font-bold font-mono text-cyan-400" dir="ltr">📞 {{ phone }}</h1>
+      <div class="text-sm text-slate-400 mt-1">صفحة {{ page }}/{{ last }} · إجمالي: {{ total }}</div>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- زر التحديث الجديد -->
+      <a href="?page={{ page }}&phone={{ phone }}&refresh=1" class="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm transition shadow-lg">🔄 تحديث الرسائل</a>
+      <div class="text-sm px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">🎟 {{ used }}/{{ mx }}</div>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    {% for m in rows %}
+      <div class="p-5 rounded-2xl bg-[#161b22] border {{ 'border-cyan-500/40' if m.otp else 'border-slate-800' }} relative group">
+        {% if m.otp %}<div class="absolute top-0 right-0 w-1 h-full bg-cyan-500"></div>{% endif %}
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-xs text-slate-500 font-mono" dir="ltr">{{ m.time[:19].replace('T',' ') }}</div>
+          {% if m.otp %}
+            <div class="flex items-center gap-2">
+              <code class="px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-300 font-bold text-lg border border-cyan-500/20">{{ m.otp }}</code>
+              <button onclick="copyOtp('{{ m.otp }}', this)" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition">📋</button>
+            </div>
+          {% endif %}
+        </div>
+        <p class="text-[15px] text-slate-300 whitespace-pre-wrap break-words">{{ m.body }}</p>
+      </div>
+    {% endfor %}
+  </div>
+  
+  <div class="mt-8 text-center">
+    <a href="{{ url_for('numbers') }}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-bold transition">🏠 رجوع للقائمة</a>
+  </div>
+{% endif %}
+
+<script>
+function copyOtp(t, el) {
+  navigator.clipboard.writeText(t).then(() => {
+    const original = el.textContent; el.textContent = '✅';
+    setTimeout(() => el.textContent = original, 1500);
+  });
+}
+</script>
+{% endblock %}
