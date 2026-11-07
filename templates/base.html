@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OTP Browser</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="bg-[#0d1117] text-slate-100 min-h-screen flex flex-col font-sans">
+  
+  <!-- القائمة العلوية -->
+  <nav class="border-b border-slate-800 bg-[#161b22]/90 backdrop-blur sticky top-0 z-50 shadow-md">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      
+      <!-- الشعار -->
+      <a href="/" class="font-bold text-xl bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent flex items-center gap-2">
+        📱 OTP Browser
+      </a>
+
+      <!-- الأزرار يمين -->
+      <div class="flex items-center gap-2 text-sm">
+        
+        <!-- زر لوحة التحكم و تسجيل الخروج -->
+        {% if session.get('user_id') %}
+          <a href="/admin" title="لوحة التحكم" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">⚙️</a>
+          <a href="/logout" title="تسجيل خروج" class="px-3 py-1.5 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/60 border border-red-900/50 transition">خروج</a>
+        {% endif %}
+        
+      </div>
+    </div>
+  </nav>
+
+  <!-- محتوى الصفحة -->
+  <main class="max-w-4xl mx-auto px-4 py-8 flex-grow w-full">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- الحقوق -->
+  <footer class="border-t border-slate-800 bg-[#161b22] py-6 mt-auto">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+      <p class="text-sm text-slate-400">
+        جميع الحقوق محفوظة &copy; 2026
+      </p>
+      <p class="text-sm mt-2">
+        Telegram: <a href="https://t.me/lifas_py" target="_blank" class="text-cyan-400 hover:text-cyan-300 font-bold hover:underline">@lifas_py</a>
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>
