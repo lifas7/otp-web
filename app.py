@@ -1,6 +1,6 @@
 # language: Python 3, file: app.py, runtime: Flask 3
 import re, os, sqlite3, requests, hashlib, json
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from flask import Flask, render_template, request, session, redirect, url_for, abort
 
 # ========= CONFIG =========
@@ -9,9 +9,10 @@ API_TOKEN  = "57786|5Q7RcOMfGEjJ914GDTsiYt1UxFsNUcADaBrJclNZed1c29c7"
 CHANNEL    = "https://t.me/r77cr"
 ADMIN_TG   = "lifas_py"
 DAILY_FREE = 3
-DB         = "otp.db"
-SECRET     = "super_secret_key_123456_otp_web"
+DB_FILE    = "otp.db"
+SECRET     = os.environ.get("SECRET", "super_secret_key_123456_otp_web")
 ADMIN_PASS = os.environ.get("ADMIN_PASS", "admin123")
+DATABASE_URL = os.environ.get("DATABASE_URL") # Railway يضيف هذا المتغير تلقائياً عند إضافة قاعدة بيانات
 # ==========================
 
 HEADERS = {
@@ -23,6 +24,7 @@ HEADERS = {
 
 app = Flask(__name__)
 app.secret_key = SECRET
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30) # جلسة 30 يوم
 
 # ========= OTP (TSOFTEDGE REGISTER) =========
 def send_registration_otp(email):
@@ -67,26 +69,50 @@ def verify_registration(email, otp_code, password):
     except:
         return False
 
-# ========= DB =========
+# ========= DB SETUP (PostgreSQL or SQLite) =========
 def db():
-    c = sqlite3.connect(DB, check_same_thread=False)
-    c.row_factory = sqlite3.Row
-    return c
+    if DATABASE_URL:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        conn.cursor_factory = RealDictCursor
+        return conn
+    else:
+        c = sqlite3.connect(DB_FILE, check_same_thread=False)
+        c.row_factory = sqlite3.Row
+        return c
 
 def init_db():
     c = db()
-    c.executescript("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        email TEXT UNIQUE,
-        password TEXT,
-        is_verified INTEGER DEFAULT 0,
-        daily_date TEXT,
-        daily_count INTEGER DEFAULT 0,
-        created_at TEXT
-    );
-    """)
+    cur = c.cursor()
+    
+    # جملة الإنشاء تختلف بين Postgres و SQLite
+    if DATABASE_URL:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            email TEXT UNIQUE,
+            password TEXT,
+            is_verified INTEGER DEFAULT 0,
+            daily_date TEXT,
+            daily_count INTEGER DEFAULT 0,
+            created_at TEXT
+        );
+        """)
+    else:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT UNIQUE,
+            password TEXT,
+            is_verified INTEGER DEFAULT 0,
+            daily_date TEXT,
+            daily_count INTEGER DEFAULT 0,
+            created_at TEXT
+        );
+        """)
     c.commit(); c.close()
 
 def hash_pw(pw):
@@ -96,16 +122,25 @@ def get_user():
     if "user_id" not in session:
         return None
     c = db()
-    row = c.execute("SELECT * FROM users WHERE id=?", (session["user_id"],)).fetchone()
+    cur = c.cursor()
+    cur.execute("SELECT * FROM users WHERE id=%s" if DATABASE_URL else "SELECT * FROM users WHERE id=?", 
+                (session["user_id"],))
+    row = cur.fetchone()
     c.close()
     return row
 
 def daily_info(user_id):
     c = db()
-    row = c.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    cur = c.cursor()
+    cur.execute("SELECT * FROM users WHERE id=%s" if DATABASE_URL else "SELECT * FROM users WHERE id=?", 
+                (user_id,))
+    row = cur.fetchone()
     today = date.today().isoformat()
+    
     if row["daily_date"] != today:
-        c.execute("UPDATE users SET daily_date=?, daily_count=0 WHERE id=?", (today, user_id))
+        cur.execute("UPDATE users SET daily_date=%s, daily_count=0 WHERE id=%s" if DATABASE_URL 
+                    else "UPDATE users SET daily_date=?, daily_count=0 WHERE id=?", 
+                    (today, user_id))
         c.commit()
         used = 0
     else:
@@ -117,11 +152,14 @@ def consume(user_id):
     used, mx, blocked = daily_info(user_id)
     if blocked: return False
     c = db()
-    c.execute("UPDATE users SET daily_count=daily_count+1 WHERE id=?", (user_id,))
+    cur = c.cursor()
+    cur.execute("UPDATE users SET daily_count=daily_count+1 WHERE id=%s" if DATABASE_URL 
+                else "UPDATE users SET daily_count=daily_count+1 WHERE id=?", 
+                (user_id,))
     c.commit(); c.close()
     return True
 
-# ========= API SMS (FOR NUMBERS) =========
+# ========= API SMS =========
 def api_numbers(page=1, country="United States"):
     r = requests.get(f"{BASE}/public-numbers", params={"country_name": country, "per_page": "50", "page": str(page)}, headers=HEADERS, timeout=15)
     r.raise_for_status(); return r.json()
@@ -148,15 +186,17 @@ def login():
         email = request.form.get("email", "").strip().lower()
         pw = request.form.get("password", "")
         c = db()
-        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        cur = c.cursor()
+        cur.execute("SELECT * FROM users WHERE email=%s" if DATABASE_URL else "SELECT * FROM users WHERE email=?", (email,))
+        row = cur.fetchone()
         c.close()
         if row and row["password"] == hash_pw(pw):
             if row["is_verified"] == 0:
-                # إذا الحساب غير مفعل، نرسله لصفحة التحقق ونرسل له كود جديد
                 send_registration_otp(email)
                 session["verify_email"] = email
                 return redirect(url_for("verify"))
             
+            session.permanent = True
             session["user_id"] = row["id"]
             return redirect(url_for("index"))
         return render_template("login.html", error="الإيميل أو الباسورد غلط", mode="login")
@@ -173,29 +213,36 @@ def register():
             return render_template("login.html", error="الباسورد يجب أن يكون 6 أحرف عالأقل، ويحتوي على حرف كبير، رقم، ورمز خاص.", mode="register")
 
         c = db()
-        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        cur = c.cursor()
+        cur.execute("SELECT * FROM users WHERE email=%s" if DATABASE_URL else "SELECT * FROM users WHERE email=?", (email,))
+        row = cur.fetchone()
         
         if row:
             if row["is_verified"] == 1:
+                c.close()
                 return render_template("login.html", error="هذا الإيميل مسجل ومفعل مسبقاً، يرجى تسجيل الدخول.", mode="register")
             else:
-                # إذا الإيميل مسجل بس غير مفعل، نحدث بياناته ونعيد إرسال الكود
-                c.execute("UPDATE users SET name=?, password=? WHERE email=?", (name, hash_pw(pw), email))
+                cur.execute("UPDATE users SET name=%s, password=%s WHERE email=%s" if DATABASE_URL 
+                            else "UPDATE users SET name=?, password=? WHERE email=?", 
+                            (name, hash_pw(pw), email))
                 c.commit()
                 send_registration_otp(email)
                 session["verify_email"] = email
+                c.close()
                 return redirect(url_for("verify"))
         
         try:
-            c.execute("INSERT INTO users (name, email, password, created_at) VALUES (?,?,?,?)",
+            cur.execute("INSERT INTO users (name, email, password, created_at) VALUES (%s, %s, %s, %s)" if DATABASE_URL 
+                        else "INSERT INTO users (name, email, password, created_at) VALUES (?, ?, ?, ?)",
                       (name, email, hash_pw(pw), datetime.now(timezone.utc).isoformat()))
             c.commit()
             
             send_registration_otp(email)
             session["verify_email"] = email
             return redirect(url_for("verify"))
-        except sqlite3.IntegrityError:
-            return render_template("login.html", error="حدث خطأ غير متوقع، حاول مرة أخرى.", mode="register")
+        except Exception:
+            c.rollback()
+            return render_template("login.html", error="حدث خطأ، الإيميل قد يكون مسجلاً.", mode="register")
         finally:
             c.close()
     return render_template("login.html", mode="register")
@@ -209,18 +256,21 @@ def verify():
         code = request.form.get("code", "").strip()
         
         c = db()
-        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        cur = c.cursor()
+        cur.execute("SELECT * FROM users WHERE email=%s" if DATABASE_URL else "SELECT * FROM users WHERE email=?", (email,))
+        row = cur.fetchone()
         
-        if verify_registration(email, code, "Aa12345678@"): # الباسورد هنا ثابت للـ API
-            c.execute("UPDATE users SET is_verified=1 WHERE email=?", (email,))
+        if verify_registration(email, code, "Aa12345678@"):
+            cur.execute("UPDATE users SET is_verified=1 WHERE email=%s" if DATABASE_URL else "UPDATE users SET is_verified=1 WHERE email=?", (email,))
             c.commit()
             session.pop("verify_email", None)
+            session.permanent = True
             session["user_id"] = row["id"]
             c.close()
             return redirect(url_for("index"))
         else:
             c.close()
-            return render_template("login.html", error="كود التحقق غلط أو منتهي، تأكد من الإيميل وحاول مرة ثانية.", mode="verify", email=email)
+            return render_template("login.html", error="كود التحقق غلط أو منتهي.", mode="verify", email=email)
             
     return render_template("login.html", mode="verify", email=email)
 
@@ -299,10 +349,13 @@ def admin():
         <form method="POST"><input type="password" name="pw" placeholder="Password" style="padding:10px;border-radius:5px;border:none;"><button type="submit" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:5px;cursor:pointer;">Enter</button></form>
         </body>'''
     c = db()
-    users = c.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
+    cur = c.cursor()
+    cur.execute("SELECT * FROM users ORDER BY id DESC")
+    users = cur.fetchall()
     c.close()
     return render_template("admin.html", users=users)
 
+# ========= INIT & RUN =========
 application = app
 init_db()
 
