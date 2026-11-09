@@ -1,31 +1,58 @@
-<!-- استبدل الجدول داخل admin.html بهذا -->
-<table class="w-full text-right whitespace-nowrap">
-  <thead class="bg-slate-800 text-slate-300">
-    <tr>
-      <th class="p-4">ID</th>
-      <th class="p-4">الاسم</th>
-      <th class="p-4">الإيميل (Google)</th>
-      <th class="p-4">الحالة</th>
-      <th class="p-4">محاولات اليوم</th>
-      <th class="p-4">تاريخ التسجيل</th>
-    </tr>
-  </thead>
-  <tbody class="divide-y divide-slate-800">
-    {% for u in users %}
-    <tr class="hover:bg-slate-800/50">
-      <td class="p-4 font-mono text-slate-500">{{ u.id }}</td>
-      <td class="p-4 font-bold text-white">{{ u.name or 'لم يكمل' }}</td>
-      <td class="p-4 text-cyan-400 font-mono" dir="ltr">{{ u.email }}</td>
-      <td class="p-4">
-        {% if u.is_complete == 1 %}
-          <span class="bg-green-900/30 text-green-400 px-2 py-1 rounded text-xs border border-green-800">مفعل</span>
-        {% else %}
-          <span class="bg-red-900/30 text-red-400 px-2 py-1 rounded text-xs border border-red-800">غير مكتمل</span>
-        {% endif %}
-      </td>
-      <td class="p-4"><span class="bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded-lg border border-cyan-800">{{ u.daily_count }}</span></td>
-      <td class="p-4 text-sm text-slate-400">{{ u.created_at[:16].replace('T',' ') }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>الإدارة - OTP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0d1117] text-slate-200 p-8 min-h-screen font-sans">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-3xl font-bold text-cyan-400">لوحة الإدارة (المستخدمين)</h1>
+      <a href="/" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-sm rounded-xl border border-slate-700 transition">العودة للموقع</a>
+    </div>
+    
+    <div class="bg-[#161b22] rounded-2xl border border-slate-800 overflow-x-auto shadow-2xl">
+      <table class="w-full text-right whitespace-nowrap">
+        <thead class="bg-slate-800 text-slate-300">
+          <tr>
+            <th class="p-4 border-b border-slate-700">ID</th>
+            <th class="p-4 border-b border-slate-700">الاسم</th>
+            <th class="p-4 border-b border-slate-700">الإيميل</th>
+            <th class="p-4 border-b border-slate-700">كلمة السر (Hash)</th>
+            <th class="p-4 border-b border-slate-700">الحالة</th>
+            <th class="p-4 border-b border-slate-700">محاولات اليوم</th>
+            <th class="p-4 border-b border-slate-700">تاريخ التسجيل</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/50">
+          {% for u in users %}
+          <tr class="hover:bg-slate-800/50 transition">
+            <td class="p-4 font-mono text-slate-500">{{ u.id }}</td>
+            <td class="p-4 font-bold text-white">{{ u.name or 'غير محدد' }}</td>
+            <td class="p-4 text-cyan-400 font-mono" dir="ltr">{{ u.email }}</td>
+            <td class="p-4 text-slate-500 text-xs font-mono" dir="ltr">{{ u.password[:15] }}...</td>
+            <td class="p-4">
+              {% if u.is_verified == 1 %}
+                <span class="bg-green-900/30 text-green-400 px-2.5 py-1 rounded-md text-xs border border-green-800">مفعل</span>
+              {% else %}
+                <span class="bg-red-900/30 text-red-400 px-2.5 py-1 rounded-md text-xs border border-red-800">غير مفعل</span>
+              {% endif %}
+            </td>
+            <td class="p-4">
+              <span class="bg-cyan-900/30 text-cyan-400 px-3 py-1 rounded-lg border border-cyan-800 font-bold">{{ u.daily_count }}</span>
+            </td>
+            <td class="p-4 text-sm text-slate-400">{{ u.created_at[:16].replace('T',' ') }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="p-8 text-center text-slate-500">لا يوجد مستخدمين مسجلين حتى الآن.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-4 text-sm text-slate-500">إجمالي المستخدمين: {{ users|length }}</p>
+  </div>
+</body>
+</html>
