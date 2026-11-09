@@ -11,7 +11,7 @@ ADMIN_TG   = "lifas_py"
 DAILY_FREE = 3
 DB         = "otp.db"
 SECRET     = "super_secret_key_123456_otp_web"
-ADMIN_PASS = "admin123"
+ADMIN_PASS = os.environ.get("ADMIN_PASS", "admin123")
 # ==========================
 
 HEADERS = {
