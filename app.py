@@ -4,8 +4,8 @@ from datetime import datetime, date, timezone
 from flask import Flask, render_template, request, session, redirect, url_for, abort
 
 # ========= CONFIG =========
-API_TOKEN  = "57786|5Q7RcOMfGEjJ914GDTsiYt1UxFsNUcADaBrJclNZed1c29c7"
 BASE       = "https://api.tsoftedge.com/api/v1"
+API_TOKEN  = "57786|5Q7RcOMfGEjJ914GDTsiYt1UxFsNUcADaBrJclNZed1c29c7"
 CHANNEL    = "https://t.me/r77cr"
 ADMIN_TG   = "lifas_py"
 DAILY_FREE = 3
@@ -23,13 +23,11 @@ HEADERS = {
 
 app = Flask(__name__)
 app.secret_key = SECRET
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# ========= OTP (TSOFTEDGE) =========
-def send_email_otp(email):
-    url = f"{BASE}/auth/password/forgot"
-    payload = {"email": email}
+# ========= OTP (TSOFTEDGE REGISTER) =========
+def send_registration_otp(email):
+    url = f"{BASE}/auth/register/send-otp"
+    payload = {"email": email, "full_name": "OTP User"}
     headers = {
         'User-Agent': "okhttp/5.5.0",
         'Accept': "application/json",
@@ -40,13 +38,21 @@ def send_email_otp(email):
     }
     try:
         r = requests.post(url, data=json.dumps(payload), headers=headers, timeout=15)
-        return r.status_code in (200, 201, 204)
+        return r.status_code in (200, 201)
     except:
         return False
 
-def verify_email_otp(email, otp_code):
-    url = f"{BASE}/auth/password/verify-code"
-    payload = {"email": email, "otp": otp_code}
+def verify_registration(email, otp_code, password):
+    url = f"{BASE}/auth/register"
+    payload = {
+        "country": "Iraq",
+        "device_name": "android-app",
+        "email": email,
+        "full_name": "OTP User",
+        "otp": otp_code,
+        "password": password,
+        "password_confirmation": password
+    }
     headers = {
         'User-Agent': "okhttp/5.5.0",
         'Accept': "application/json",
@@ -57,7 +63,7 @@ def verify_email_otp(email, otp_code):
     }
     try:
         r = requests.post(url, data=json.dumps(payload), headers=headers, timeout=15)
-        return r.status_code == 200
+        return r.status_code in (200, 201)
     except:
         return False
 
@@ -115,7 +121,7 @@ def consume(user_id):
     c.commit(); c.close()
     return True
 
-# ========= API SMS =========
+# ========= API SMS (FOR NUMBERS) =========
 def api_numbers(page=1, country="United States"):
     r = requests.get(f"{BASE}/public-numbers", params={"country_name": country, "per_page": "50", "page": str(page)}, headers=HEADERS, timeout=15)
     r.raise_for_status(); return r.json()
@@ -146,7 +152,11 @@ def login():
         c.close()
         if row and row["password"] == hash_pw(pw):
             if row["is_verified"] == 0:
-                return render_template("login.html", error="حسابك غير مفعل. يرجى إدخال كود التفعيل.", mode="login", needs_verify=True, email=email)
+                # إذا الحساب غير مفعل، نرسله لصفحة التحقق ونرسل له كود جديد
+                send_registration_otp(email)
+                session["verify_email"] = email
+                return redirect(url_for("verify"))
+            
             session["user_id"] = row["id"]
             return redirect(url_for("index"))
         return render_template("login.html", error="الإيميل أو الباسورد غلط", mode="login")
@@ -163,18 +173,29 @@ def register():
             return render_template("login.html", error="الباسورد يجب أن يكون 6 أحرف عالأقل، ويحتوي على حرف كبير، رقم، ورمز خاص.", mode="register")
 
         c = db()
+        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        
+        if row:
+            if row["is_verified"] == 1:
+                return render_template("login.html", error="هذا الإيميل مسجل ومفعل مسبقاً، يرجى تسجيل الدخول.", mode="register")
+            else:
+                # إذا الإيميل مسجل بس غير مفعل، نحدث بياناته ونعيد إرسال الكود
+                c.execute("UPDATE users SET name=?, password=? WHERE email=?", (name, hash_pw(pw), email))
+                c.commit()
+                send_registration_otp(email)
+                session["verify_email"] = email
+                return redirect(url_for("verify"))
+        
         try:
             c.execute("INSERT INTO users (name, email, password, created_at) VALUES (?,?,?,?)",
                       (name, email, hash_pw(pw), datetime.now(timezone.utc).isoformat()))
             c.commit()
             
-            # نرسل الكود للمستخدم
-            send_email_otp(email)
-            
+            send_registration_otp(email)
             session["verify_email"] = email
             return redirect(url_for("verify"))
         except sqlite3.IntegrityError:
-            return render_template("login.html", error="هذا الإيميل مسجل مسبقاً", mode="register")
+            return render_template("login.html", error="حدث خطأ غير متوقع، حاول مرة أخرى.", mode="register")
         finally:
             c.close()
     return render_template("login.html", mode="register")
@@ -187,21 +208,28 @@ def verify():
     if request.method == "POST":
         code = request.form.get("code", "").strip()
         
-        # نتحقق من الكود عبر API
-        if verify_email_otp(email, code):
-            c = db()
+        c = db()
+        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        
+        if verify_registration(email, code, "Aa12345678@"): # الباسورد هنا ثابت للـ API
             c.execute("UPDATE users SET is_verified=1 WHERE email=?", (email,))
             c.commit()
-            row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-            c.close()
-            
             session.pop("verify_email", None)
             session["user_id"] = row["id"]
+            c.close()
             return redirect(url_for("index"))
         else:
-            return render_template("login.html", error="كود التحقق غلط، تأكد من الإيميل وحاول مرة ثانية.", mode="verify", email=email)
+            c.close()
+            return render_template("login.html", error="كود التحقق غلط أو منتهي، تأكد من الإيميل وحاول مرة ثانية.", mode="verify", email=email)
             
     return render_template("login.html", mode="verify", email=email)
+
+@app.route("/resend-otp")
+def resend_otp():
+    email = session.get("verify_email")
+    if email:
+        send_registration_otp(email)
+    return redirect(url_for("verify"))
 
 @app.route("/logout")
 def logout():
@@ -213,7 +241,9 @@ def logout():
 def index():
     u = get_user()
     if not u: return redirect(url_for("login"))
-    if u["is_verified"] == 0: return redirect(url_for("verify"))
+    if u["is_verified"] == 0: 
+        session["verify_email"] = u["email"]
+        return redirect(url_for("verify"))
     return render_template("index.html", user=u)
 
 @app.route("/numbers")
